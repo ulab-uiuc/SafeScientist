@@ -1,170 +1,295 @@
-# Open-Source Research Project in Python: A Template
+<div style="width: 100%;">
+  <img src="assets/tiny_scientist.png" style="width: 100%;"></img>
+</div>
 
-[![Python 3.10](https://img.shields.io/badge/python-3.10-blue.svg)](https://www.python.org/downloads/release/python-3109/)
+<h1 align="center">TinyScientist: A Lightweight Framework for Building Research Agents</h1>
+
+<div align="center">
+
+[![PyPI version](https://img.shields.io/pypi/v/tiny-scientist)](https://pypi.org/project/tiny-scientist/)
+[![Python 3.10](https://img.shields.io/badge/python-%E2%89%A53.10-blue)](https://www.python.org/downloads/release/python-3109/)
+[![GitHub pull request](https://img.shields.io/badge/PRs-welcome-red)](https://github.com/hiyouga/LLaMA-Factory/pulls)
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)](https://pre-commit.com/)
-<a href="https://github.com/psf/black"><img alt="Code style: black" src="https://img.shields.io/badge/code%20style-black-000000.svg"></a>
-[![Checked with mypy](https://www.mypy-lang.org/static/mypy_badge.svg)](https://mypy-lang.org/)
 [![bear-ified](https://raw.githubusercontent.com/beartype/beartype-assets/main/badge/bear-ified.svg)](https://beartype.readthedocs.io)
-[![Github Action](https://github.com/lwaekfjlk/python-project-template/actions/workflows/pytest.yml/badge.svg?branch=main)]()
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
-> [!NOTE]
-> This repo is continuously updating with more tools. Any contribution is welcome.
+</div>
 
-## ✨ Motivation
+# Introduction
 
-To ensure high standards in engineering projects, we offer a standardized template specifically designed for open-source Python research projects. This template is an excellent choice if you:
+**Tiny-Scientist** is a lightweight, user-friendly framework for automating the entire lifecycle of scientific research—**from ideation to implementation, writing, and review**. Designed for flexibility, it integrates smoothly with your favorite LLMs and search tools.
 
-1. Want to facilitate seamless collaboration and extension of your project by other researchers.
-2. Aim to bridge communication gaps among collaborators effectively.
-3. Seek to make rapid iterations with assurance that small code modifications won’t disrupt the overall project.
-4. Wish to reduce the frequency of frustrating runtime errors during experiments.
+#### Core Features
 
-## 🔨 Continuous Integration (CI) Workflow
+- 🧠 **Think**: Generate structured research ideas from an intent string.
+- 💻 **Code**: Automatically generate and run experiments based on the idea.
+- ✍️ **Write**: Convert your results and ideas into a conference-style paper.
+- 📝 **Review**: Review any form of paper and output structured feedback in JSON.
 
-Here's a clearer and more straightforward guideline of the steps for working with your codebase. If working in a small group or working on a simple project, some of the steps can be skipped.
+#### Software Architecture
 
-1. **Create Issue**
+Our codebase is structured around three core components to support an extensible framework: **core**, **tools**, and **formatters**. The **core** module provides essential functionalities, **tools** enhance and extend these core capabilities, and **formatters** handle input/output tasks such as LaTeX template rendering.
 
-   Before starting, open a new issue in the repository detailing what you plan to implement. Assign the issue to yourself.
+<p align="center">
+  <img src="assets/architecture.png" alt="architecture" width="100%"/>
+</p>
 
-2. **Sync Repo**
 
-   Update your local repository to match the latest version of the remote repository.
+# Installation
 
-3. **Create Branch**
+#### Option 1: Install via pip (recommended)
 
-   Create a new branch for your task. Name it appropriately based on the type of task, such as `feature/feature-name`, `bug/bug-name`, or `exp/exp-name`.
-
-4. **Implement Code**
-
-   Work on your task and make necessary changes to the codebase.
-
-5. **Test Locally**
-
-   Run tests using tools like mypy, pytest, and pre-commit. Ensure all tests pass before proceeding.
-
-6. **Change Commit**
-
-   Add and commit your changes to the branch, then push the branch to the repository.
-
-7. **Create PR**
-
-   Open a Pull Request (PR) for the branch you've pushed.
-
-8. **Link PR to Issue**
-
-   In your PR, include "Closes #ISSUE_NUM" to link it to the original issue.
-
-9. **Pass Continuous Integration**
-
-   Ensure all GitHub Actions checks pass. If they fail, revise your code based on the errors reported.
-
-10. **Review PR Checklist**
-
-    Verify that all items in the PR checklist are completed, such as updating documentation or adding package requirements.
-
-11. **Ask for Code Review**
-
-    Invite a colleague to review your PR. One approved, Use the "Squash and Merge" option to merge your PR, ensuring a clean commit history.
-
-12. **Troubleshooting**
-
-    If you break down the commit history or main branch, contact the repository owner for assistance with `rebase` or other needed actions.
-
-## 💼 Template Structure
-
-The current project template supports the final package release of our codebase.
-
-```
-Template/
-│
-├── .github/                  # Contains GitHub related files like workflows
-├── docs/                     # Documentation for the project
-├── src/                      # Main package directory
-├── stubs/                    # Type stubs for static typing (for mypy strict mode)
-├── tests/                    # Test scripts and resources
-│
-├── .gitignore                # Specifies untracked files to ignore
-├── .pre-commit-config.yaml   # Configurations for pre-commit hooks
-├── poetry.lock               # Lock file generated by poetry for dependencies
-├── pyproject.toml            # Project metadata and tool configurations
+```bash
+pip install tiny-scientist
 ```
 
-## ❓ Issue & Pull Request
+#### Option 2: Install from source
 
-An issue typically describes a new feature (`feature`), fixing an old bug (`bug`), launching a group of experiments (`exp`), or refactoring part of the code (`refactor`). Using different issue templates for different issues.
+```bash
+# create conda environment
+conda create -n tiny-scientist python=3.10
+conda activate tiny-scientist
 
-A PR typically implements the content mentioned in one issue.
+# Install Poetry
+curl -sSL https://install.python-poetry.org | python3
+export PATH="$HOME/.local/bin:$PATH"
 
-Notice about the development:
+# Install dependencies
+poetry install
+```
 
-1. When creating an issue, assign the responsible member for fixing that if possible
-2. When creating a PR, make sure you uses `feature/feature-name`, `bug/bug-name`, `exp/exp-name` for its branch
-3. When finishing one PR, make sure all the github action is passed and all the checks are done.
-4. When merging one PR, make sure using `squash and merge` instead of `merge a pull request`.
-5. Avoid making any direct commit to the `main` branch and try to avoid any `--force` push to any branch unless you are pretty sure about that.
+# Get started
 
-## 👷 Type Checking
+Before running any code, set your API key:
 
-- Tools
+```bash
+export OPENAI_API_KEY=your-key-here
+# or use DEEPSEEK_API_KEY, ANTHROPIC_API_KEY, or OPENROUTER_API_KEY
+```
 
-  - static type checking (`mypy`)
+If you want to use local ollama models, set the API base:
 
-  - dynamic type checking (`beartype`)
+```bash
+export OLLAMA_API_BASE=http://192.168.23.11:11434
+```
 
-- Guidelines
-  - Run `mypy --strict ./` under the root of the current repo to test the static type.
+You can then specify ollama models like so: `ollama/llama3.2:latest` for example.
 
-## 🏅️ Unit Testing
+For LM Studio it is similar:
 
-- Tools
+```bash
+export LM_STUDIO_API_BASE=http://localhost:1234/v1
+```
 
-  - testing code components based on testing function (`pytest`)
+but you do need to specify an API key, even if it's a dummy value:
 
-- Guidelines
-  - Run `pytest` under the root of the current repo to check unit test results.
+```bash
+export LM_STUDIO_API_KEY=dummy-api-key
+```
 
-## 🧐 Code Spell Checking
+And the models are specified like so: `lm_studio/qwen2.5-coder-32b-instruct-mlx`
 
-- Tools
+For other openAI compatible backend providers, set the following variables:
 
-  - code spell checking (`codespell`)
+```bash
+export OPENAI_API_BASE=http://192.168.9.14/v1
+export OPENAI_API_KEY=your-key-here
+```
 
-- Guidelines
-  - Commonly need to ignore part of the files in the repository like `/data`.
+and specify your model like so: `openai/qwen3-30b-a3b`
 
-## 🪝 Pre-commit Hook
+Now you can use Tiny-Scientist in Python with only a few lines of code:
 
-- Tools
+```python
+from tiny_scientist import TinyScientist
 
-  - code formatting (`prettier`)
+scientist = TinyScientist(model="gpt-4o")
 
-  - import package sorting (`isort`)
+# Step 1: Generate a json-format research idea
+idea = scientist.think(intent="Benchmarking adaptive step size strategies using a convex quadratic optimization function")
 
-  - ipynb output clear (`nbstripout`)
+# Step 2: Run experiments (you can provide baseline_results if available)
+status, experiment_dir = scientist.code(idea=idea)
 
-  - code bug checking (`ruff`)
+# if the experiments run successfully
+if status is True:
+    # Step 3: Write a paper
+    pdf_path = scientist.write(idea=idea, experiment_dir=experiment_dir)
 
-- Guidelines
+    # Step 4: Review the paper
+    review = scientist.review(pdf_path=pdf_path)
+```
 
-  - Run `python -m pip install pre-commit` to install `pre-commit`
+# Managing API Keys (Optional)
 
-  - Run `pre-commit install` to allow hooking pre-commit with any `git commit` commands.
+You can configure keys using a `.toml` file for convenience beyond exporting.
 
-## 🧑‍💼 Dependency Management
+#### Step 1: Copy the template
 
-- Tools
+```bash
+cp config.template.toml config.toml
+```
 
-  - We utilize `poetry` to support the dependency requirements. Dependency for different usage of the repo can be defined separately in `pyproject.toml`.
+#### Step 2: Fill in your API credentials
 
-- Guidelines
+Edit `config.toml` to include your keys, such as:
 
-  - Run `pip install poetry` to finish the installation of poetry.
+```toml
+[core]
+llm_api_key = "xxxx"
+```
 
-  - Create `conda environment` with a specified Python version
+No need to export environment variables manually—just set this once.
 
-  - Run `poetry install` to install required dependencies.
+# Developing
 
-## ❤️ Contribution
+#### Develop Demo
+To develop a demo (Both frontend and backend):
+```bash
+python backend/app.py
+```
+```bash
+cd frontend
+npm install
+npm start
+```
+# Q&A
 
-I welcome all kinds of contributions, e.g. adding more tools, better practices, and discussion on trade-offs.
+If you face "cairo"-related errors, cario is a system-level dependency, please run `conda install -c conda-forge cairo` or `brew install cairo`.
+
+If you face errors related to pdflatex, this is also a system-level dependency for latex rendering, please run `brew install --cask mactex`.
+
+# Contribution
+
+We're working on extending support for more tools, models, and paper formats. Contributions welcome!
+
+# Citation
+
+```
+@misc{tinyscientist,
+author       = {Haofei Yu and Keyang Xuan and Fenghai Li and Zijie Lei and Jiaxuan You},
+title        = {TinyScientist: A Lightweight Framework for Building Research Agents},
+howpublished = {https://github.com/ulab-uiuc/tiny-scientist},
+note         = {Accessed: 2025-04-14},
+year         = {2025}
+}
+```
+
+# TinyScientist ReAct
+
+This project extends TinyScientist with ReAct (Reasoning + Acting) capabilities for conducting domain-specific scientific experiments through a combination of LLM reasoning and specialized tool usage.
+
+## Overview
+
+The TinyScientist ReAct module allows you to:
+
+1. Run experiments in specific domains (chemistry, physics, or general) using specialized scientific tools
+2. Generate research papers based on experiment results
+3. Produce scientific analyses with proper reasoning and methodology
+
+## Requirements
+
+- Python 3.8+
+- Required packages (install via `pip install -r requirements.txt`)
+- Access to OpenAI API or other supported LLM APIs
+
+## Quick Start
+
+The easiest way to run an experiment is using the provided bash script:
+
+```bash
+# Make the script executable
+chmod +x run_experiment.sh
+
+# Run a chemistry experiment
+./run_experiment.sh --chemistry
+
+# Run a physics experiment
+./run_experiment.sh --physics
+
+# Run a general experiment
+./run_experiment.sh --general
+```
+
+## Advanced Usage
+
+The bash script supports additional parameters:
+
+```bash
+./run_experiment.sh --help
+```
+
+Output:
+```
+Usage: run_experiment.sh [options]
+Options:
+  -h, --help              Show this help message
+  -m, --model MODEL       Specify the LLM model (default: gpt-4o)
+  -d, --domain DOMAIN     Set domain: chemistry, physics, general (default: general)
+  -i, --intent TEXT       Specify experiment intent
+  -o, --output DIR        Set output directory (default: ./output)
+  --max-iter NUM          Set maximum iterations (default: 10)
+  -t, --template FORMAT   Paper template: acl, iclr (default: acl)
+
+Predefined experiment examples:
+  --chemistry             Run chemistry experiment (solubility study)
+  --physics               Run physics experiment (thermal-electrical property comparison)
+  --general               Run general ML experiment
+```
+
+## Python API
+
+You can also directly use the Python script:
+
+```bash
+python example_react_experiment.py --domain chemistry --intent "Investigate how temperature affects the solubility of NaCl in water"
+```
+
+Or import the TinyScientist class in your own code:
+
+```python
+from tiny_scientist import TinyScientist
+
+scientist = TinyScientist(model="gpt-4o")
+idea = scientist.think(intent="Your research question")
+status, experiment_dir = scientist.react_experiment(
+    idea=idea,
+    domain="chemistry",
+    max_iterations=15
+)
+```
+
+## Available Domains and Tools
+
+### Chemistry
+- `MoleculeReactionTool`: Simulates chemical reactions between molecules
+- `MoleculePropertyTool`: Retrieves properties of chemical compounds
+- `SolubilityTool`: Determines solubility of compounds in various solvents
+
+### Physics
+- `KinematicsTool`: Calculates kinematic quantities in classical mechanics
+- `ElectricalTool`: Calculates electrical quantities using Ohm's Law
+- `ThermodynamicsTool`: Performs thermodynamic calculations and simulations
+
+### General
+- Includes all tools from both domains
+
+## Example Workflow
+
+1. The system generates a research idea based on your intent
+2. The ReAct agent iteratively:
+   - Reasons about the next step (Thought)
+   - Selects and calls appropriate tools (Action)
+   - Analyzes results (Observation)
+3. Once the experiment is complete, a research paper is generated
+4. A scientific review of the paper is provided
+
+## Troubleshooting
+
+- If tools aren't loading correctly, check that the `tiny_scientist/tools` directory contains the correct tool files
+- For LLM API errors, verify your API keys are set correctly
+- Experiment logs are saved in the output directory for debugging
+
+## License
+
+[MIT License](LICENSE)

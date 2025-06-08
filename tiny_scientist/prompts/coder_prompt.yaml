@@ -1,0 +1,114 @@
+experiment_keyword_prompt: |
+  The experiment is organized into three sections:
+  ## Model Section:
+  {model}
+
+  ## Dataset Section:
+  {dataset}
+
+  ## Metric Section:
+  {metric}
+
+  Your job is to extract the essential names of models, datasets, and evaluation metrics that are directly useful for coding and experimentation.
+
+  ### Output Format:
+  Return a JSON object with the following structure:
+  ```json
+  {{
+    "model": ["Model1", "Model2", ...],
+    "dataset": ["Dataset1", "Dataset2", ...],
+    "metric": ["Metric1", "Metric2", ...]
+  }}
+
+experiment_prompt: |
+  You are writing a Python script named `experiment.py` that must be runnable.
+
+  ## Research Context
+  Title: {title}
+  Problem: {problem}
+  Novelty: {novelty}
+  Proposed Approach: {approach}
+
+  ## Experimental Setup
+  The following describes the experiment setup. You must base your implementation strictly on this structure:
+
+  Models/Algorithms to use: {model}
+  Datasets involved: {dataset}
+  Evaluation metrics: {metric}
+
+  ## Execution Command (DO NOT MODIFY):
+  You have {max_runs} runs to complete this experiment. For each run, the script will be executed using:
+  `python experiment.py --out_dir=run_i`
+  where `i` is the run number (`run_1`, `run_2`, etc.).
+
+  ## YOU MUST ENSURE experiment.py:
+  1. Parses the `--out_dir` argument.
+  2. Creates the output directory using `os.makedirs(out_dir, exist_ok=True)`.
+  3. Performs actual model training and evaluation — DO NOT simulate results using random numbers or hardcode experiment result, all result should get from execution.
+  4. Implements evaluation metircs with real logic.
+  5. **Saves results as a dictionary in a file named `final_info.json` placed directly inside `out_dir`** — do **not** save into nested folders like `out_dir/variant_name/final_info.json`.
+
+  ## Computational Constraints
+  - Ensure the code is computationally affordable to run on a single GPU or CPU machine.
+  - Avoid using large models like GPT, T5, BERT-large, or full ImageNet training.
+  - Prefer small-scale tasks, toy models, or low-cost benchmarks (e.g., MNIST, UCI datasets, small MLPs or ResNet18).
+  - Do not use complex distributed training or multi-GPU setups.
+
+  Do not add extra command-line arguments.
+  If your current experiment.py has placeholder code like `...`, replace them with runnable implementations.
+  If any external functions like `compute_loss`, `evaluate_model`, or `log_results` are used, implement them too.
+
+  ## Baseline Results
+  You do not need to re-run the baseline. If available, the results are provided below:
+    {baseline_results}
+
+  ---
+  Please begin writing the `experiment.py` file now.
+
+experiment_success_prompt: |
+  Run {run_num} completed. Here are the results:
+  {results}
+
+  Decide if you need to re-plan your experiments given the result (you often will not need to).
+
+  Someone else will be using `notes.txt` to perform a writeup on this in the future.
+  Please include *all* relevant information for the writeup on Run {run_num}, including an experiment description and the run number. Be as verbose as necessary.
+
+  Then, implement the next thing on your list.
+  We will then run the command `python experiment.py --out_dir=run_{next_run}'.
+  YOUR PROPOSED CHANGE MUST USE THIS COMMAND FORMAT, DO NOT ADD ADDITIONAL COMMAND LINE ARGS.
+  If you are finished with experiments, respond with 'ALL_COMPLETED'.
+
+experiment_error_prompt: |
+  There was an error running the experiment script:
+  {message}
+  Your goal is still to implement this experiment: {Title}.
+  The purpose is: {Experiment}.
+  You have {max_runs} runs total. We're currently on run {run_time}.
+  Please fix `experiment.py` so that it runs successfully with:
+  `python experiment.py --out_dir=run_{run_time}`.
+  Make sure to implement any missing parts like model definition, loss function, data loading, and final_info.json saving.
+
+
+experiment_timeout_prompt: |
+  Run timed out after {timeout} seconds
+
+plot_initial_prompt: |
+  Great job! Please modify `plot.py` to generate the most relevant plots for the final writeup.
+
+  In particular, be sure to fill in the "labels" dictionary with the correct names for each run that you want to plot.
+
+  Only the runs in the `labels` dictionary will be plotted, so make sure to include all relevant runs.
+
+  We will be running the command `python plot.py` to generate the plots.
+
+plot_error_prompt: |
+  Plotting failed with the following error {error}
+
+plot_timeout_prompt: |
+  Plotting timed out after {timeout} seconds
+
+notes_prompt: |
+  Please modify `notes.txt` with a description of what each plot shows along with the filename of the figure. Please do so in-depth.
+
+  Somebody else will be using `notes.txt` to write a report on this in the future.
