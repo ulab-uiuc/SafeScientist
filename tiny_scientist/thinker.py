@@ -31,10 +31,13 @@ class Thinker:
         output_dir: str = "",
         temperature: float = 0.75,
         prompt_template_dir: Optional[str] = None,
-        enable_malicious_agents: bool = False,
-        enable_defense_agent: bool = False,
-        attack_probability: float = 0.5,
-        attack_severity: str = "medium",  # low, medium, high
+        # --- Four independent switches ---
+        enable_attack_stage1: bool = False,    # Group discussion attack
+        enable_defense_stage1: bool = False,   # Group discussion defense
+        enable_attack_stage2: bool = False,    # Summarization stage attack
+        enable_defense_stage2: bool = False,   # Summarization stage defense
+        attack_strategy: str = "subtle_harm",
+        defense_strategy: str = "risk_analysis",
     ):
         self.tools = tools
         self.iter_num = iter_num
@@ -51,79 +54,43 @@ class Thinker:
         self.experiment_type = ""
         self._query_cache: Dict[str, List[Dict[str, Any]]] = {}
         
-        # Enable malicious agents settings
-        self.enable_malicious_agents = enable_malicious_agents
-        self.enable_defense_agent = enable_defense_agent
-        self.attack_probability = attack_probability
-        self.attack_severity = attack_severity
+        # Four switches control
+        self.enable_attack_stage1 = enable_attack_stage1
+        self.enable_defense_stage1 = enable_defense_stage1
+        self.enable_attack_stage2 = enable_attack_stage2
+        self.enable_defense_stage2 = enable_defense_stage2
+        self.attack_strategy = attack_strategy
+        self.defense_strategy = defense_strategy
         
         # Load scientist prompts from YAML file
         yaml_path = osp.join(osp.dirname(__file__), "prompts", "scientist_prompts.yaml")
         with open(yaml_path, 'r', encoding='utf-8') as f:
             self.SCIENTIST_PROMPTS = yaml.safe_load(f)
         
-        # Define malicious agent role
-        self.malicious_agent_config = {
-            "role": "Malicious Agent",
-            "expertise": "subverting legitimate research discussions",
-            "focus": "introducing subtle manipulations to research ideas"
-        }
-        
-        # Attack targets (what aspects to attack)
-        self.attack_targets = [
-            "methodology",
-            "ethical_considerations",
-            "safety_measures",
-            "research_goals",
-            "experiment_design"
-        ]
-        
-        # Intercepted messages
-        self.intercepted_messages = {}
-        self.corrected_messages = {}
-        
-        # Discussion history
-        self.discussion_history = []
+        # Discussion history will be initialized for each run
+        self.discussion_history: List[Dict[str, Any]] = []
 
-        # Get all domain-specific experts
-        domain_experts = list(self.SCIENTIST_PROMPTS[self.domain].items()) if self.domain in self.SCIENTIST_PROMPTS else []
-        # Get common experts
-        common_experts = list(self.SCIENTIST_PROMPTS["common"].items())
-        # Combine all experts
-        all_experts = domain_experts + common_experts
-        # malicious agent
+        # Only create agent when needed (any stage enabled)
         self.malicious_agent = None
-        if self.enable_malicious_agents:
+        if enable_attack_stage1 or enable_attack_stage2:
             self.malicious_agent = MaliciousAgent(
                 model=self.model,
                 client=self.client,
-                role="Research Expert",
-                expertise="Scientific methodology",
-                focus="Research innovation"
+                attack_strategy=self.attack_strategy
             )
-            all_experts.append(("malicious_agent", {
-                "role": "Research Expert",
-                "expertise": "Scientific methodology",
-                "focus": "Research innovation"
-            }))
-            
-        # defense agent
+            print(f"[INFO] MaliciousAgent initialized with strategy: '{self.attack_strategy}'")
+
         self.defense_agent = None
-        if self.enable_defense_agent:
+        if enable_defense_stage1 or enable_defense_stage2:
             self.defense_agent = DefenseAgent(
                 model=self.model,
                 client=self.client,
-                role="Security Expert",
-                expertise="detecting manipulations and deception",
-                focus="ensuring research integrity and safety"
+                defense_strategy=self.defense_strategy
             )
-            all_experts.append(("defense_agent", {
-                "role": "Security Expert",
-                "expertise": "detecting manipulations and deception",
-                "focus": "ensuring research integrity and safety"
-            }))
+            print(f"[INFO] DefenseAgent initialized with strategy: '{self.defense_strategy}'")
             
-        self.all_experts = all_experts
+        # This will be built dynamically in _conduct_group_discussion based on the domain
+        self.all_experts: List[Tuple[str, Dict[str, str]]] = []
 
         self.WRITER_MINI_REQUIRED_KEYS = [
             "Title", "Problem", "Approach", "Expected Results", 
@@ -176,13 +143,13 @@ class Thinker:
         # Rebuild self.all_experts for current discussion context
         current_all_experts = domain_experts + common_experts_list
         # Add malicious/defense agents if enabled
-        if self.enable_malicious_agents and self.malicious_agent:
+        if self.enable_attack_stage1 and self.malicious_agent:
             current_all_experts.append(("malicious_agent", {
                 "role": "Research Expert", "expertise": "Scientific methodology", "focus": "Research innovation"
             }))
-        if self.enable_defense_agent and self.defense_agent:
+        if self.enable_defense_stage1 and self.defense_agent:
              current_all_experts.append(("defense_agent", {
-                "role": "Security Expert", "expertise": "detecting manipulations and deception", "focus": "ensuring research integrity and safety"
+                "role": "Research Scientist", "expertise": "research methodology and best practices", "focus": "ensuring research quality and responsible conduct"
             }))
         # Remove duplicates based on agent name (first element of tuple)
         seen_expert_names = set()
@@ -197,6 +164,55 @@ class Thinker:
         for round_num in range(num_rounds):
             print(f"\nRound {round_num + 1} discussion:")
             for expert_name, expert_info in self.all_experts:
+                
+                # --- Added: Special handling for malicious_agent ---
+                if expert_name == "malicious_agent" and self.malicious_agent:
+                    print(f"\n{expert_info['role']} ('{expert_name}') is thinking...")
+                    contribution = self.malicious_agent.participate_in_discussion(
+                        idea_json=idea_json,
+                        discussion_history=self.discussion_history,
+                        intent=self.intent,
+                        related_works=related_works_string
+                    )
+                    # Use the actual malicious contribution content
+                    formatted_contribution = {
+                        "agent_name": expert_name,
+                        "role": expert_info['role'],
+                        "round": round_num + 1,
+                        "content": contribution.get('content', ''),
+                        "_malicious": True,
+                        "attack_strategy": contribution.get("attack_strategy", "unknown")
+                    }
+                    self.discussion_history.append(formatted_contribution)
+                    print(f"{expert_info['role']} ('{expert_name}') completed analysis for round {round_num + 1}.")
+                    continue  # Skip generic processing logic
+                
+                # --- Added: Special handling for defense_agent ---
+                if expert_name == "defense_agent" and self.defense_agent:
+                    print(f"\n{expert_info['role']} ('{expert_name}') is thinking...")
+                    
+                    # Defense agent participates in discussion like a normal scientist
+                    contribution = self.defense_agent.participate_in_discussion(
+                        idea_json=idea_json,
+                        discussion_history=self.discussion_history,
+                        intent=self.intent,
+                        related_works=related_works_string
+                    )
+                    
+                    # Use the actual defense contribution content
+                    defense_contribution = {
+                        "agent_name": expert_name,
+                        "role": expert_info['role'], 
+                        "round": round_num + 1,
+                        "content": contribution.get('content', ''),
+                        "_defense": True,
+                        "defense_strategy": self.defense_strategy
+                    }
+                    self.discussion_history.append(defense_contribution)
+                    print(f"{expert_info['role']} ('{expert_name}') completed analysis for round {round_num + 1}.")
+                    continue
+                
+                # --- The following is normal expert processing, completely unchanged ---
                 print(f"\n{expert_info['role']} ('{expert_name}') is thinking...")
                 prompt = self._get_agent_prompt(expert_info, idea_json, self.intent, related_works_string, self.discussion_history)
                 system_prompt = f"""You are {expert_info['role']}, an expert in {expert_info['expertise']}.
@@ -232,21 +248,15 @@ SUGGESTIONS: [Your specific suggestions for improvement]"""
                     "original_suggestions": suggestions_content, # Store pre-manipulation suggestions
                 }
                 
-                # Log the (potentially modified) content to discussion_history for full transparency
-                    self.discussion_history.append({
+                # Log the content to discussion_history
+                self.discussion_history.append({
                     "agent_name": expert_name,
-                        "role": expert_info['role'],
+                    "role": expert_info['role'],
                     "round": round_num + 1,
-                    "content": f"THOUGHT: {current_group_opinion_for_history.get('manipulated_thought', current_group_opinion_for_history['original_thought'])}\nSUGGESTIONS: {current_group_opinion_for_history.get('manipulated_suggestions', current_group_opinion_for_history['original_suggestions'])}",
-                    # Add more fields if malicious/defense agents modify them, e.g., "is_manipulated", "is_corrected"
+                    "content": f"THOUGHT: {thought_content}\nSUGGESTIONS: {suggestions_content}",
                 })
                 print(f"{expert_info['role']} ('{expert_name}') completed analysis for round {round_num + 1}.")
 
-        if self.enable_malicious_agents and hasattr(self, 'attack_session_id') and self.attack_session_id:
-            self._save_attack_logs()
-        if self.enable_defense_agent and hasattr(self, 'defense_session_id') and self.defense_session_id:
-            self._save_defense_logs()
-            
         print(f"[DEBUG] Multi-agent discussion completed. History length: {len(self.discussion_history)}")
         return self.discussion_history
 
@@ -321,6 +331,7 @@ SUGGESTIONS: [Your specific suggestions for improvement]"""
             print(f"[WARNING] Discussion history for refinement prompt is very long ({len(discussion_str)} chars). Truncating.")
             discussion_str = discussion_str[:5000] + "\n...[TRUNCATED DISCUSSION HISTORY]...\n" + discussion_str[-5000:]
         
+        # Base summarization prompt
         synthesis_prompt = f"""
         Based on the following detailed group discussion, please refine the research idea.
         
@@ -340,114 +351,146 @@ SUGGESTIONS: [Your specific suggestions for improvement]"""
         Ensure all original fields are present, updated as necessary, and no new fields are added unless they are standard for the idea structure.
         """
         
+        # --- Stage 2 Attack: Attack summarization stage ---
+        attack_system_message = self.prompts.idea_system_prompt  # Default system message
+        if self.enable_attack_stage2 and self.malicious_agent:
+            print("[DEBUG] Stage 2 Attack: Injecting malicious instructions into summarization prompt...")
+            attack_injection = self.malicious_agent.inject_into_summarization(
+                original_prompt=synthesis_prompt,
+                idea_json=idea_json,
+                discussion_history=group_discussion_history
+            )
+            synthesis_prompt = attack_injection.get("modified_prompt", synthesis_prompt)
+            # Use the malicious agent's system prompt for consistency
+            attack_system_message = self.malicious_agent.system_prompt if self.malicious_agent else self.prompts.idea_system_prompt
+            print(f"[MALICIOUS] Applied prompt injection. Strategy: {attack_injection.get('attack_strategy', 'unknown')}")
+        
+        # Call LLM for summarization
         text, _ = get_response_from_llm(
             synthesis_prompt,
             client=self.client, model=self.model,
-            system_message=self.prompts.idea_system_prompt, # This system prompt should guide JSON output
+            system_message=attack_system_message, # Use attack-specific system message when attacking
             msg_history=[], temperature=self.temperature,
         )
         
+        # Parse LLM response with improved robustness
         refined_idea_dict = extract_json_between_markers(text)
+        
+        # If JSON extraction fails, try alternative parsing methods
         if not refined_idea_dict or not isinstance(refined_idea_dict, dict):
-            print("[WARNING] Failed to extract refined idea JSON from LLM response after group discussions. Returning original idea string.")
-            print(f"[DEBUG] LLM response for refinement was: {text[:500]}...")
-            return idea_json # Fallback to original idea JSON string if refinement fails to produce valid JSON dict
+            print("[WARNING] Primary JSON extraction failed. Trying alternative methods...")
             
+            # Try to extract complete JSON manually
+            try:
+                # Look for complete JSON object with proper nesting
+                def extract_complete_json(text: str) -> str:
+                    """Extract complete JSON with proper bracket matching"""
+                    start_idx = text.find('{')
+                    if start_idx == -1:
+                        return ""
+                    
+                    bracket_count = 0
+                    end_idx = start_idx
+                    in_string = False
+                    escape_next = False
+                    
+                    for i, char in enumerate(text[start_idx:], start_idx):
+                        if escape_next:
+                            escape_next = False
+                            continue
+                        
+                        if char == '\\':
+                            escape_next = True
+                            continue
+                        
+                        if char == '"' and not escape_next:
+                            in_string = not in_string
+                            continue
+                        
+                        if not in_string:
+                            if char == '{':
+                                bracket_count += 1
+                            elif char == '}':
+                                bracket_count -= 1
+                                if bracket_count == 0:
+                                    end_idx = i
+                                    break
+                    
+                    return text[start_idx:end_idx + 1]
+                
+                complete_json_str = extract_complete_json(text)
+                if complete_json_str:
+                    refined_idea_dict = json.loads(complete_json_str)
+                    print("[DEBUG] Successfully extracted complete JSON using alternative method.")
+                
+            except (json.JSONDecodeError, IndexError, TypeError) as e:
+                print(f"[WARNING] Alternative JSON extraction also failed: {e}")
+        
+        # Final fallback: Use original idea but ensure Defense Agent still runs
+        if not refined_idea_dict or not isinstance(refined_idea_dict, dict):
+            print("[WARNING] All JSON extraction methods failed. Using original idea but continuing with Defense Agent...")
+            try:
+                refined_idea_dict = json.loads(idea_json)
+            except json.JSONDecodeError:
+                print("[ERROR] Original idea_json is also not valid JSON. Creating minimal dict.")
+                refined_idea_dict = {"Title": "Error in JSON processing", "Problem": "JSON parsing failed"}
+            
+        # --- Stage 2 Defense: Defend summarization stage ---
+        # IMPORTANT: This block should ALWAYS run when Defense is enabled, regardless of JSON parsing success
+        if self.enable_defense_stage2 and self.defense_agent:
+            print("[DEBUG] Stage 2 Defense: Reviewing and securing final idea...")
+            # Defense agent checks final idea to ensure security
+            refined_idea_json_str = json.dumps(refined_idea_dict, indent=2)
+            defense_result = self.defense_agent.secure_final_idea(refined_idea_json_str)
+            
+            secured_idea_json = defense_result.get("secured_idea")
+            if secured_idea_json:
+                try:
+                    # Handle both JSON string and already parsed dict
+                    if isinstance(secured_idea_json, str):
+                        secured_idea_dict = json.loads(secured_idea_json)
+                    elif isinstance(secured_idea_json, dict):
+                        secured_idea_dict = secured_idea_json
+                    else:
+                        print(f"[DEFENSE] Unexpected secured_idea type: {type(secured_idea_json)}")
+                        secured_idea_dict = None
+                    
+                    if secured_idea_dict:
+                        # Force apply security measures - always update the idea
+                        refined_idea_dict = secured_idea_dict
+                        print(f"[DEFENSE] Final idea secured. Applied comprehensive security enhancements.")
+                        print(f"[DEFENSE] Security risks identified: {len(defense_result.get('security_risks', []))}")
+                        print(f"[DEFENSE] Security measures added: {len(defense_result.get('recommended_safeguards', []))}")
+                except (json.JSONDecodeError, TypeError) as e:
+                    print("[DEFENSE] Failed to parse secured idea JSON, applying manual security measures...")
+                    # Manual fallback - force add security measures directly
+                    if "Safety_Protocol" not in refined_idea_dict:
+                        refined_idea_dict["Safety_Protocol"] = "MANDATORY: Comprehensive multi-layered safety protocols including BSL-3/4 containment, IRB approval, regulatory compliance, and independent oversight required."
+                    if "Ethical_Framework" not in refined_idea_dict:
+                        refined_idea_dict["Ethical_Framework"] = "REQUIRED: Full institutional review board approval, ethics committee monitoring, and stakeholder consultation mandatory."
+                    # Enhance existing fields with security language
+                    for field in ["Problem", "Approach", "Experiment"]:
+                        if field in refined_idea_dict:
+                            if isinstance(refined_idea_dict[field], str):
+                                if "safety" not in refined_idea_dict[field].lower():
+                                    refined_idea_dict[field] += " This research requires comprehensive safety protocols and ethical oversight."
+                            elif isinstance(refined_idea_dict[field], dict) and field == "Experiment":
+                                refined_idea_dict[field]["Safety_Requirements"] = "MANDATORY: Maximum safety containment and ethical oversight required."
+            else:
+                print("[DEFENSE] No secured idea returned, applying manual security measures...")
+                # Apply manual security enhancements
+                refined_idea_dict["Comprehensive_Safety_Framework"] = {
+                    "Biosafety_Level": "BSL-3/4 containment required",
+                    "Ethical_Approval": "IRB approval and ongoing monitoring mandatory",
+                    "Regulatory_Compliance": "Full regulatory approval required",
+                    "Security_Clearance": "Personnel background checks required",
+                    "Risk_Assessment": "Comprehensive dual-use risk evaluation mandatory"
+                }
+        
         # It is crucial that refined_idea_dict maintains the structure expected by _ensure_final_idea_structure
         # We can call _ensure_final_idea_structure here too, or rely on the one in think()
         # For now, let think() handle the final absolute structural guarantee.
         return json.dumps(refined_idea_dict, indent=2)
-
-    def _manipulate_agent_message(self, original_message: Dict[str, Any], attack_target: str) -> Dict[str, Any]:
-        """Manipulate an agent's message according to the attack strategy."""
-        manipulated_message = original_message.copy()
-        
-        # Get the system prompt for the malicious agent
-        system_prompt = self.prompts.manipulator_system_prompt
-        
-        # Format manipulation prompt template
-        manipulation_prompt = self.prompts.manipulation_prompt.format(
-            role=self.malicious_agent_config['role'],
-            expertise=self.malicious_agent_config['expertise'],
-            thought=original_message['thought'],
-            suggestions=original_message['suggestions'],
-            rating=original_message.get('rating', 5.0),  # Default to 5.0 if rating is missing
-            target=attack_target
-        )
-        
-        # Get manipulated message
-        try:
-            text, _ = get_response_from_llm(
-                manipulation_prompt,
-                client=self.client,
-                model=self.model,
-                system_message=system_prompt,
-                msg_history=[],
-                temperature=0.7,  # Slightly higher temperature for more creativity in manipulation
-            )
-            
-            # Extract the manipulated parts
-            try:
-                parts = text.split("THOUGHT:")
-                if len(parts) < 2:
-                    raise ValueError("Missing THOUGHT section")
-                    
-                thought_and_rest = parts[1]
-                thought_parts = thought_and_rest.split("SUGGESTIONS:")
-                if len(thought_parts) < 2:
-                    raise ValueError("Missing SUGGESTIONS section")
-                    
-                manipulated_thought = thought_parts[0].strip()
-                
-                suggestions_and_rest = thought_parts[1]
-                suggestions_parts = suggestions_and_rest.split("RATING:")
-                if len(suggestions_parts) < 2:
-                    raise ValueError("Missing RATING section")
-                    
-                manipulated_suggestions = suggestions_parts[0].strip()
-                
-                rating_text = suggestions_parts[1].strip()
-                import re
-                rating_match = re.search(r'(\d+(\.\d+)?)', rating_text)
-                if not rating_match:
-                    raise ValueError("Could not find numeric rating")
-                manipulated_rating = float(rating_match.group(1))
-                
-                manipulated_message["thought"] = manipulated_thought
-                manipulated_message["suggestions"] = manipulated_suggestions
-                manipulated_message["rating"] = manipulated_rating
-            except Exception as e:
-                print(f"[red]Failed to manipulate message: {e}[/red]")
-                # Return original message if manipulation fails
-                return original_message
-        except Exception as e:
-            print(f"[red]Error calling LLM for manipulation: {e}[/red]")
-            return original_message
-            
-        return manipulated_message
-        
-    def _save_defense_logs(self):
-        """Save logs of the defense session."""
-        if not hasattr(self, 'corrected_messages') or not self.corrected_messages:
-            return
-            
-        defense_log_dir = osp.join(self.output_dir, "defense_logs")
-        log_file = osp.join(defense_log_dir, f"{self.defense_session_id}.json")
-        
-        # Create a summary of the defense
-        defense_summary = {
-            "session_id": self.defense_session_id,
-            "intent": self.intent,
-            "domain": self.domain,
-            "experiment_type": self.experiment_type,
-            "corrected_messages": self.corrected_messages
-        }
-        
-        # Save to JSON file
-        with open(log_file, 'w') as f:
-            json.dump(defense_summary, f, indent=2)
-            
-        print(f"[green](Hidden) Defense logs saved to {log_file}[/green]")
 
     def _load_pdf_content(self, pdf_path: Optional[str] = None) -> Optional[str]:
         if pdf_path and osp.isfile(pdf_path):
@@ -498,10 +541,8 @@ SUGGESTIONS: [Your specific suggestions for improvement]"""
         self.experiment_type = experiment_type
         # pdf_content is passed to think method
 
-        # Reset states for a fresh run if these are instance variables accumulating across calls to run()
-        if hasattr(self, 'intercepted_messages'): self.intercepted_messages = {}
-        if hasattr(self, 'corrected_messages'): self.corrected_messages = {}
-        if hasattr(self, 'discussion_history'): self.discussion_history = [] # Reset history for a new run
+        # Reset discussion history for a fresh run 
+        self.discussion_history = []
 
         first_discussion_history = None # To store history of the first idea if num_ideas=1 or only for first
 
@@ -536,12 +577,6 @@ SUGGESTIONS: [Your specific suggestions for improvement]"""
 
             print(f"[INFO] Thinker.run: Generated idea (in run method): {idea_dict.get('Title', 'Unnamed')}")
 
-            # The original run method had _refine_idea and generate_experiment_plan here.
-            # _refine_idea was a loop of self.rethink(), and generate_experiment_plan was called based on self.generate_exp_plan.
-            # My modified self.think() now incorporates generate_experiment_plan if self.generate_exp_plan is true,
-            # and also calls _ensure_final_idea_structure. The old _refine_idea loop is not in the new self.think.
-            # If that iterative refinement is still needed, it would have to be added back into self.think or here.
-            
             # For simplicity, I am assuming the idea_dict from self.think is now the "current_idea_final"
             current_idea_final_dict = idea_dict
             
@@ -555,11 +590,6 @@ SUGGESTIONS: [Your specific suggestions for improvement]"""
                     print(f"[ERROR] Thinker.run: Failed to parse idea JSON after novelty check: {current_idea_final_json_str[:200]}...")
                     # Decide how to handle, maybe use pre-novelty-check version
             
-            # Add metadata about manipulations and defenses (this part of logic can remain if relevant)
-            if self.enable_malicious_agents and hasattr(self, 'intercepted_messages') and self.intercepted_messages:
-                current_idea_final_dict["_potentially_manipulated"] = True
-                # ... (rest of malicious/defense logging)
-
             all_ideas_with_details.append(current_idea_final_dict)
             print(f"[INFO] Thinker.run: Completed processing for idea: {current_idea_final_dict.get('Title', 'Unnamed')}")
 
@@ -859,9 +889,9 @@ SUGGESTIONS: [Your specific suggestions for improvement]"""
             if any(keyword in text_to_check for keyword in keywords): return 'physical'
         for _, keywords in computational_keywords_map.items():
             if any(keyword in text_to_check for keyword in keywords): return 'computational'
-                
+        
         print("[INFO] thinker._determine_experiment_type: Defaulting to 'computational'.")
-                return 'computational'
+        return 'computational'
                 
     @api_calling_error_exponential_backoff(retries=3, base_wait_time=2) # Added retry
     def _generate_experiment_plan(self, idea_json_str: str) -> str:
@@ -1058,30 +1088,6 @@ SUGGESTIONS: [Your specific suggestions for improvement]"""
             )
 
         return "\n\n".join(paper_strings)
-
-    def _save_attack_logs(self):
-        """Save logs of the attack session."""
-        if not hasattr(self, 'intercepted_messages') or not self.intercepted_messages:
-            return
-            
-        attack_log_dir = osp.join(self.output_dir, "attack_logs")
-        log_file = osp.join(attack_log_dir, f"{self.attack_session_id}.json")
-        
-        # Create a summary of the attack
-        attack_summary = {
-            "session_id": self.attack_session_id,
-            "intent": self.intent,
-            "domain": self.domain,
-            "experiment_type": self.experiment_type,
-            "attack_severity": self.attack_severity,
-            "intercepted_messages": self.intercepted_messages
-        }
-        
-        # Save to JSON file
-        with open(log_file, 'w') as f:
-            json.dump(attack_summary, f, indent=2)
-            
-        print(f"[red](Hidden) Attack logs saved to {log_file}[/red]")
 
     def _ensure_final_idea_structure(self, idea_json_str: str, intent_for_defaults: str) -> str:
         """
