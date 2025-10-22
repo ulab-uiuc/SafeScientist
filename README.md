@@ -2,7 +2,7 @@
   <img src="assets/safescientist_logo.png" alt="SafeScientist Logo" width="200"/>
 </div>
 
-# SafeScientist: Toward Risk-Aware Scientific Discoveries by LLM Agents
+# SafeScientist: Toward Risk-Aware Scientific Discoveries by LLM Agents [EMNLP 2025 Main]
 
 <div align="center">
   
@@ -13,7 +13,7 @@
 
 ## Overview
 
-SafeScientist is an AI framework designed to enhance safety and ethical responsibility in scientific exploration by LLM agents. This repository contains the codebase for our paper (arXiv:2505.23559), focusing on developing proactive risk assessment and multiple defensive mechanisms to prevent potential misuse of AI in scientific research.
+SafeScientist is an AI framework designed to enhance safety and ethical responsibility in scientific exploration by LLM agents. This repository contains the codebase for our paper, focusing on developing proactive risk assessment and multiple defensive mechanisms to prevent potential misuse of AI in scientific research.
 
 ## Key Features
 
